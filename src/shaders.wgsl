@@ -3,8 +3,8 @@ const FLT_MAX: f32 = 3.40282346638528859812e+38;
 const OBJECT_COUNT: u32 = 2;
 alias Scene = array<Sphere, OBJECT_COUNT>;
 var<private> scene: Scene = Scene(
-	Sphere(/*center*/ vec3(0., 0., -1.), /*radius*/ 0.5),
-	Sphere(/*center*/ vec3(0., -100.5, -1.), /*radius*/ 100.),
+    Sphere(/*center*/ vec3(0., 0., -1.), /*radius*/ 0.5),
+    Sphere(/*center*/ vec3(0., -100.5, -1.), /*radius*/ 100.),
 );
 
 alias TriangleVertices = array<vec2f, 6>;
@@ -18,7 +18,7 @@ var<private> vertices: TriangleVertices = TriangleVertices(
 );
 
 @vertex fn display_vs(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4f {
-	return vec4f(vertices[vid], 0.0, 1.0);
+    return vec4f(vertices[vid], 0.0, 1.0);
 }
 
 struct Uniforms {
@@ -40,17 +40,17 @@ fn intersect_sphere(ray: Ray, sphere: Sphere) -> f32 {
 
     let d = b * b - a * c;
     if d < 0. {
-	    return -1.;
-	}
-
-	let sqrt_d = sqrt(d);
-	let recip_a = 1. / a;
-	let mb = -b;
-	let t = (mb - sqrt_d) * recip_a;
-	if t > 0. {
-	    return t;
+        return -1.;
     }
-	return (mb + sqrt_d) * recip_a;
+
+    let sqrt_d = sqrt(d);
+    let recip_a = 1. / a;
+    let mb = -b;
+    let t = (mb - sqrt_d) * recip_a;
+    if t > 0. {
+        return t;
+    }
+    return (mb + sqrt_d) * recip_a;
 }
 
 struct Ray {
@@ -59,23 +59,23 @@ struct Ray {
 }
 
 fn sky_color(ray: Ray) -> vec3f {
-	let t = 0.5 * (normalize(ray.direction).y + 1.);
-	return (1.0 - t) * vec3(1.) + t * vec3(0.3, 0.5, 1.);
+    let t = 0.5 * (normalize(ray.direction).y + 1.);
+    return (1.0 - t) * vec3(1.) + t * vec3(0.3, 0.5, 1.);
 }
 
 @fragment fn display_fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-	let origin = vec3(0.);
-	let focus_distance = 1.;
-	let aspect_ratio = f32(uniforms.width) / f32(uniforms.height);
+    let origin = vec3(0.);
+    let focus_distance = 1.;
+    let aspect_ratio = f32(uniforms.width) / f32(uniforms.height);
 
-	// Normalize the viewport coordinates.
-	var uv = pos.xy / vec2f(f32(uniforms.width - 1u), f32(uniforms.height - 1u));
+    // Normalize the viewport coordinates.
+    var uv = pos.xy / vec2f(f32(uniforms.width - 1u), f32(uniforms.height - 1u));
 
-	// Map `uv` from y-down (normalized) viewport coordinates to camera coordinates.
-	uv = (2. * uv - vec2(1.)) * vec2(aspect_ratio, -1.);
+    // Map `uv` from y-down (normalized) viewport coordinates to camera coordinates.
+    uv = (2. * uv - vec2(1.)) * vec2(aspect_ratio, -1.);
 
-	let direction = vec3(uv, -focus_distance);
-	let ray = Ray(origin, direction);
+    let direction = vec3(uv, -focus_distance);
+    let ray = Ray(origin, direction);
 
     var closest_t = FLT_MAX;
     for (var i = 0u; i < OBJECT_COUNT; i += 1u) {
@@ -85,7 +85,7 @@ fn sky_color(ray: Ray) -> vec3f {
         }
     }
     if closest_t < FLT_MAX {
-			return vec4(1., 0.76, 0.03, 1.) * saturate(1. - closest_t);
+            return vec4(1., 0.76, 0.03, 1.) * saturate(1. - closest_t);
     }
     return vec4(sky_color(ray), 1.);
 }
