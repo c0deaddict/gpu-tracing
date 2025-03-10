@@ -58,13 +58,13 @@ fn intersect_sphere(ray: Ray, sphere: Sphere) -> Intersection {
     let mb = -b;
     let t1 = (mb - sqrt_d) * recip_a;
     let t2 = (mb + sqrt_d) * recip_a;
-	let t = select(t2, t1, t1 > 0.);
-	if t <= 0. {
-		return no_intersection();
+    let t = select(t2, t1, t1 > 0.);
+    if t <= 0. {
+        return no_intersection();
     }
 
-	let p = point_on_ray(ray, t);
-	let N = (p - sphere.center) / sphere.radius;
+    let p = point_on_ray(ray, t);
+    let N = (p - sphere.center) / sphere.radius;
     return Intersection(N, t);
 }
 
@@ -74,7 +74,7 @@ struct Ray {
 }
 
 fn point_on_ray(ray: Ray, t: f32) -> vec3<f32> {
-	return ray.origin + t * ray.direction;
+    return ray.origin + t * ray.direction;
 }
 
 fn sky_color(ray: Ray) -> vec3f {
