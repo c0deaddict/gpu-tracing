@@ -1,16 +1,22 @@
 // Originally written in 2023 by Arman Uguray <arman.uguray@gmail.com>
 // SPDX-License-Identifier: CC-BY-4.0
 
+use winit::{event::ElementState, window::CursorGrabMode};
+
 use {
     anyhow::{Context, Result},
     winit::{
-        event::{Event, WindowEvent},
+        event::{DeviceEvent, Event, MouseScrollDelta, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::{Window, WindowBuilder},
     },
 };
 
+mod algebra;
+mod camera;
 mod render;
+
+use crate::{algebra::Vec3, camera::Camera};
 
 // Assign the appropriate window size in terms of physical pixels based on your display DPI.
 const WIDTH: u32 = 1600;
@@ -26,8 +32,16 @@ async fn main() -> Result<()> {
         .with_title("GPU Path Tracer".to_string())
         .build(&event_loop)?;
 
+    // window.set_cursor_grab(CursorGrabMode::Confined)?;
+
     let (device, queue, surface) = connect_to_gpu(&window).await?;
     let mut renderer = render::PathTracer::new(device, queue, WIDTH, HEIGHT);
+    let mut camera = Camera::look_at(
+        Vec3::new(0., 0.75, 1.),
+        Vec3::new(0., -0.5, -1.),
+        Vec3::new(0., 1., 0.),
+    );
+    let mut mouse_button_pressed = false;
 
     event_loop.run(|event, control_handle| {
         control_handle.set_control_flow(ControlFlow::Poll);
@@ -44,11 +58,32 @@ async fn main() -> Result<()> {
                         .texture
                         .create_view(&wgpu::TextureViewDescriptor::default());
 
-                    renderer.render_frame(&render_target);
+                    renderer.render_frame(&camera, &render_target);
 
                     frame.present();
                     window.request_redraw();
+                },
+                WindowEvent::MouseWheel { delta, .. } =>  {
+                    let delta = match delta {
+                        MouseScrollDelta::PixelDelta(delta) => 0.001 * delta.y as f32,
+                        MouseScrollDelta::LineDelta(_, y) => y * 0.05,
+                    };
+                    camera.zoom(delta);
+                    renderer.reset_samples();
+                },
+                WindowEvent::MouseInput { state, .. } => {
+                    // NOTE: If multiple mouse buttons are pressed, releasing any of them will set this to false.
+                    mouse_button_pressed = state == ElementState::Pressed;
                 }
+                _ => (),
+            },
+            Event::DeviceEvent { event, .. } =>  match event {
+                DeviceEvent::MouseMotion { delta: (dx, dy) } => {
+                    if mouse_button_pressed {
+                        camera.pan(dx as f32 * 0.01, dy as f32 * -0.01);
+                        renderer.reset_samples();
+                    }
+                },
                 _ => (),
             },
             _ => (),

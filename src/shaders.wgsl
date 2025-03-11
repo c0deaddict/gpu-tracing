@@ -26,11 +26,19 @@ var<private> vertices: TriangleVertices = TriangleVertices(
 }
 
 struct Uniforms {
+    camera: CameraUniforms,
     width: u32,
     height: u32,
     frame_count: u32,
 }
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+struct CameraUniforms {
+    origin: vec3f,
+    u: vec3f,
+    v: vec3f,
+    w: vec3f,
+}
 
 struct Rng {
     state: u32,
@@ -167,7 +175,7 @@ fn sky_color(ray: Ray) -> vec3f {
 @fragment fn display_fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     init_rng(vec2u(pos.xy));
 
-    let origin = vec3(0.);
+    let origin = uniforms.camera.origin;
     let focus_distance = 1.;
     let aspect_ratio = f32(uniforms.width) / f32(uniforms.height);
 
@@ -180,7 +188,8 @@ fn sky_color(ray: Ray) -> vec3f {
     // Map `uv` from y-down (normalized) viewport coordinates to camera coordinates.
     uv = (2. * uv - vec2(1.)) * vec2(aspect_ratio, -1.);
 
-    let direction = vec3(uv, -focus_distance);
+    let camera_rotation = mat3x3(uniforms.camera.u, uniforms.camera.v, uniforms.camera.w);
+    let direction = camera_rotation * vec3(uv, focus_distance);
     var ray = Ray(origin, direction);
     var throughput = vec3f(1.);
     var radiance_sample = vec3(0.);
