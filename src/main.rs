@@ -13,8 +13,8 @@ use {
 mod render;
 
 // Assign the appropriate window size in terms of physical pixels based on your display DPI.
-const WIDTH: u32 = 1024;
-const HEIGHT: u32 = 768;
+const WIDTH: u32 = 1600;
+const HEIGHT: u32 = 1200;
 
 #[pollster::main]
 async fn main() -> Result<()> {
