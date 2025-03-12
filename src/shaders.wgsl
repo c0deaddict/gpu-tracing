@@ -165,11 +165,26 @@ fn sample_lambertian(normal: vec3f) -> vec3f {
 }
 
 fn scatter(input_ray: Ray, hit: Intersection, material: Material) -> Scatter {
+    let incident = normalize(input_ray.direction);
+    let incident_dot_normal = dot(incident, hit.normal);
+    let is_front_face = incident_dot_normal < 0.;
+    let N = select(-hit.normal, hit.normal, is_front_face);
+    let cos_theta = abs(incident_dot_normal);
+
+    // `ior`, `ref_ratio` and `cannot_refract` only has meaning if the material is transmissive.
+    let is_transmissive = material.specular_or_ior < 0.;
+    let is_specular = material.specular_or_ior > 0.;
+    let ior = abs(material.specular_or_ior);
+    let ref_ratio = select(ior, 1. / ior, is_front_face);
+    let cannot_refract = ref_ratio * ref_ratio * (1.0 - cos_theta * cos_theta) > 1.;
+
     var scattered: vec3f;
-    if material.specular == 1 {
-        scattered = reflect(input_ray.direction, hit.normal);
+    if is_specular || (is_transmissive && cannot_refract) {
+        scattered = reflect(incident, N);
+    } else if is_transmissive {
+        scattered = refract(incident, N, ref_ratio);
     } else {
-        scattered = sample_lambertian(hit.normal);
+        scattered = sample_lambertian(N);
     }
     let output_ray = Ray(point_on_ray(input_ray, hit.t), scattered);
     let attenuation = material.color;
@@ -178,7 +193,7 @@ fn scatter(input_ray: Ray, hit: Intersection, material: Material) -> Scatter {
 
 struct Material {
     color: vec3f,
-    specular: u32,
+    specular_or_ior: f32,
 }
 
 struct Ray {
@@ -195,22 +210,25 @@ fn sky_color(ray: Ray) -> vec3f {
     return (1.0 - t) * vec3(1.) + t * vec3(0.3, 0.5, 1.);
 }
 
-const OBJECT_COUNT: u32 = 3;
+const OBJECT_COUNT: u32 = 4;
 alias Scene = array<Sphere, OBJECT_COUNT>;
 alias Materials = array<Material, OBJECT_COUNT>;
 
 var<private> materials: Materials = Materials(
-    Material(/*color*/ vec3(0.7, 0.5, 0.5), /*specular*/1),
-    Material(/*color*/ vec3(1., 1., 1.), /*specular*/0),
-    Material(/*color*/ vec3(0.7, 0.9, 0.2), /*specular*/0),
+    Material(/*color*/ vec3(0.7, 0.5, 0.5), /*specular_or_ior*/1.),
+    Material(/*color*/ vec3(0.5, 0.5, 0.9), /*specular_or_ior*/0.),
+    Material(/*color*/ vec3(0.7, 0.9, 0.2), /*specular_or_ior*/0.),
+    Material(/*color*/ vec3(1.), /*specular_or_ior*/-1.5),
 );
 
 var<private> scene: Scene = Scene(
-    Sphere(/*center*/ vec3(-0.6, 0.5, 0.), /*radius*/ 0.5, /*material_index*/ 0),
-    Sphere(/*center*/ vec3(0.6, 0.5, 0.), /*radius*/ 0.5, /*material_index*/ 1),
+    Sphere(/*center*/ vec3(-1.1, 0.5, 0.), /*radius*/ 0.5, /*material_index*/ 0),
+    Sphere(/*center*/ vec3(0., 0.5, 0.),   /*radius*/ 0.5, /*material_index*/ 1),
+    Sphere(/*center*/ vec3(1.1, 0.5, 0.),  /*radius*/ 0.5, /*material_index*/ 3),
+
+    // Ground
     Sphere(/*center*/ vec3(0., -2e2 - EPSILON, 0.), /*radius*/ 2e2, /*material_index*/ 2),
 );
-
 
 @fragment fn display_fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     init_rng(vec2u(pos.xy));
