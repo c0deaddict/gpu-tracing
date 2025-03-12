@@ -1,11 +1,13 @@
 const FLT_MAX: f32 = 3.40282346638528859812e+38;
 const EPSILON: f32 = 1e-3;
 
-const OBJECT_COUNT: u32 = 2;
+const OBJECT_COUNT: u32 = 4;
 alias Scene = array<Sphere, OBJECT_COUNT>;
 var<private> scene: Scene = Scene(
-    Sphere(/*center*/ vec3(0., 0., -1.), /*radius*/ 0.5, /*color*/ vec3(0.5, 0.4, 0.)),
-    Sphere(/*center*/ vec3(0., -100.5, -1.), /*radius*/ 100., /*color*/ vec3(0.7, 0.4, 0.6)),
+    Sphere(/*center*/ vec3(1., 0., -1.), /*radius*/ 0.5, /*color*/ vec3(0.5, 0.4, 0.)),
+    Sphere(/*center*/ vec3(-1., 0., -1.), /*radius*/ 0.5, /*color*/ vec3(0.2, 0.5, 0.2)),
+    Sphere(/*center*/ vec3(0., -1.1, -1.), /*radius*/ 0.5, /*color*/ vec3(0.7, 0.4, 0.6)),
+    Sphere(/*center*/ vec3(0.,  1.1, -1.), /*radius*/ 0.5, /*color*/ vec3(0.2, 0.2, 1.)),
 );
 
 @group(0) @binding(1) var radiance_samples_old: texture_2d<f32>;
