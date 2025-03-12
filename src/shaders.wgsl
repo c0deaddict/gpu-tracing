@@ -1,14 +1,6 @@
 const FLT_MAX: f32 = 3.40282346638528859812e+38;
 const EPSILON: f32 = 1e-3;
-
-const OBJECT_COUNT: u32 = 4;
-alias Scene = array<Sphere, OBJECT_COUNT>;
-var<private> scene: Scene = Scene(
-    Sphere(/*center*/ vec3(1., 0., -1.), /*radius*/ 0.5, /*color*/ vec3(0.5, 0.4, 0.)),
-    Sphere(/*center*/ vec3(-1., 0., -1.), /*radius*/ 0.5, /*color*/ vec3(0.2, 0.5, 0.2)),
-    Sphere(/*center*/ vec3(0., -1.1, -1.), /*radius*/ 0.5, /*color*/ vec3(0.7, 0.4, 0.6)),
-    Sphere(/*center*/ vec3(0.,  1.1, -1.), /*radius*/ 0.5, /*color*/ vec3(0.2, 0.2, 1.)),
-);
+const TWO_PI: f32 = 6.2831853;
 
 @group(0) @binding(1) var radiance_samples_old: texture_2d<f32>;
 @group(0) @binding(2) var radiance_samples_new: texture_storage_2d<rgba32float, write>;
@@ -84,14 +76,29 @@ fn rand_f32() -> f32 {
     return bitcast<f32>(0x3f800000u | (xorshift32() >> 9u)) - 1.;
 }
 
+// Uniformly sample a unit sphere centered at the origin.
+fn sample_sphere() -> vec3f {
+    let r0 = rand_f32();
+    let r1 = rand_f32();
+
+    // Map r0 to [-1, 1]
+    let y = 1. - 2. * r0;
+
+    // Compute the projected radius on the xz-plane using Pythagorean theorem.
+    let xz_r = sqrt(1. - y * y);
+
+    let phi = TWO_PI * r1;
+    return vec3(xz_r * cos(phi), y, xz_r * sin(phi));
+}
+
 struct Intersection {
     normal: vec3f,
     t: f32,
-    color: vec3f,
+    material_index: u32,
 }
 
 fn no_intersection() -> Intersection {
-    return Intersection(vec3(0.), -1., vec3(0.));
+    return Intersection(vec3(0.), -1., 0);
 }
 
 fn is_intersection_valid(hit: Intersection) -> bool {
@@ -101,7 +108,7 @@ fn is_intersection_valid(hit: Intersection) -> bool {
 struct Sphere {
     center: vec3f,
     radius: f32,
-    color: vec3f,
+    material_index: u32,
 }
 
 fn intersect_sphere(ray: Ray, sphere: Sphere) -> Intersection {
@@ -127,7 +134,7 @@ fn intersect_sphere(ray: Ray, sphere: Sphere) -> Intersection {
 
     let p = point_on_ray(ray, t);
     let N = (p - sphere.center) / sphere.radius;
-    return Intersection(N, t, sphere.color);
+    return Intersection(N, t, sphere.material_index);
 }
 
 fn intersect_scene(ray: Ray) -> Intersection {
@@ -153,11 +160,25 @@ struct Scatter {
     ray: Ray,
 }
 
-fn scatter(input_ray: Ray, hit: Intersection) -> Scatter {
-    let scattered = reflect(input_ray.direction, hit.normal);
+fn sample_lambertian(normal: vec3f) -> vec3f {
+    return normal + sample_sphere() * (1. - EPSILON);
+}
+
+fn scatter(input_ray: Ray, hit: Intersection, material: Material) -> Scatter {
+    var scattered: vec3f;
+    if material.specular == 1 {
+        scattered = reflect(input_ray.direction, hit.normal);
+    } else {
+        scattered = sample_lambertian(hit.normal);
+    }
     let output_ray = Ray(point_on_ray(input_ray, hit.t), scattered);
-    let attenuation = hit.color;
+    let attenuation = material.color;
     return Scatter(attenuation, output_ray);
+}
+
+struct Material {
+    color: vec3f,
+    specular: u32,
 }
 
 struct Ray {
@@ -173,6 +194,23 @@ fn sky_color(ray: Ray) -> vec3f {
     let t = 0.5 * (normalize(ray.direction).y + 1.);
     return (1.0 - t) * vec3(1.) + t * vec3(0.3, 0.5, 1.);
 }
+
+const OBJECT_COUNT: u32 = 3;
+alias Scene = array<Sphere, OBJECT_COUNT>;
+alias Materials = array<Material, OBJECT_COUNT>;
+
+var<private> materials: Materials = Materials(
+    Material(/*color*/ vec3(0.7, 0.5, 0.5), /*specular*/1),
+    Material(/*color*/ vec3(1., 1., 1.), /*specular*/0),
+    Material(/*color*/ vec3(0.7, 0.9, 0.2), /*specular*/0),
+);
+
+var<private> scene: Scene = Scene(
+    Sphere(/*center*/ vec3(-0.6, 0.5, 0.), /*radius*/ 0.5, /*material_index*/ 0),
+    Sphere(/*center*/ vec3(0.6, 0.5, 0.), /*radius*/ 0.5, /*material_index*/ 1),
+    Sphere(/*center*/ vec3(0., -2e2 - EPSILON, 0.), /*radius*/ 2e2, /*material_index*/ 2),
+);
+
 
 @fragment fn display_fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     init_rng(vec2u(pos.xy));
@@ -205,7 +243,8 @@ fn sky_color(ray: Ray) -> vec3f {
             break;
         }
 
-        let scattered = scatter(ray, hit);
+        let material = materials[hit.material_index];
+        let scattered = scatter(ray, hit, material);
         throughput *= scattered.attenuation;
         ray = scattered.ray;
         path_length += 1u;
